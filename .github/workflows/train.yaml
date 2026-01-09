@@ -1,0 +1,45 @@
+name: Model Training Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run training script
+      run: |
+        python train.py | tee output.txt
+
+    - name: Job Summary
+      run: |
+        echo "## Experiment Results" >> $GITHUB_STEP_SUMMARY
+        echo "**Name:** ABDUL-Rahim" >> $GITHUB_STEP_SUMMARY
+        echo "**Roll No:** 2022BCS0109" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        grep "MSE" output.txt >> $GITHUB_STEP_SUMMARY
+        grep "R2" output.txt >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: model-and-results
+        path: |
+          output/model/model.pkl
+          output/results/results.json
