@@ -28,7 +28,9 @@ y = df["quality"]
 # Feature selection
 # -------------------------
 corr = df.corr()["quality"].abs().sort_values(ascending=False)
+selected_features = corr[corr > 0.2].index.drop("quality")
 
+X = df[selected_features]
 
 # -------------------------
 # Train-test split
@@ -48,8 +50,8 @@ X_test = scaler.transform(X_test)
 # Model (ONE experiment)
 # -------------------------
 model = RandomForestRegressor(
-    n_estimators=50,
-    max_depth=10,
+    n_estimators=100,
+    max_depth=15,
     random_state=42
 )
 model.fit(X_train, y_train)
