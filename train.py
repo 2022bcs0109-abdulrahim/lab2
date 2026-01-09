@@ -49,7 +49,7 @@ X_test = scaler.transform(X_test)
 # -------------------------
 model = RandomForestRegressor(
     n_estimators=50,
-    max_depth=15,
+    max_depth=10,
     random_state=42
 )
 model.fit(X_train, y_train)
