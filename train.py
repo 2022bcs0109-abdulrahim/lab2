@@ -26,10 +26,10 @@ y = df["quality"]
 # -------------------------
 # Feature selection
 # -------------------------
-# corr = df.corr()["quality"].abs().sort_values(ascending=False)
-# selected_features = corr[corr > 0.2].index.drop("quality")
+corr = df.corr()["quality"].abs().sort_values(ascending=False)
+selected_features = corr[corr > 0.2].index.drop("quality")
 
-# X = df[selected_features]
+X = df[selected_features]
 
 # -------------------------
 # Train-test split
@@ -41,14 +41,14 @@ X_train, X_test, y_train, y_test = train_test_split(
 # -------------------------
 # Scaling
 # -------------------------
-# scaler = StandardScaler()
-# X_train = scaler.fit_transform(X_train)
-# X_test = scaler.transform(X_test)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
 # -------------------------
 # Model (ONE experiment)
 # -------------------------
-model = LinearRegression()
+model = Ridge(alpha=0.1)
 model.fit(X_train, y_train)
 
 # -------------------------
