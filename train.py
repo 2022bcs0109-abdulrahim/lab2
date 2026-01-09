@@ -6,6 +6,7 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
 # -------------------------
@@ -25,10 +26,10 @@ y = df["quality"]
 # -------------------------
 # Feature selection
 # -------------------------
-corr = df.corr()["quality"].abs().sort_values(ascending=False)
-selected_features = corr[corr > 0.2].index.drop("quality")
+# corr = df.corr()["quality"].abs().sort_values(ascending=False)
+# selected_features = corr[corr > 0.2].index.drop("quality")
 
-X = df[selected_features]
+# X = df[selected_features]
 
 # -------------------------
 # Train-test split
@@ -40,14 +41,14 @@ X_train, X_test, y_train, y_test = train_test_split(
 # -------------------------
 # Scaling
 # -------------------------
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
+# scaler = StandardScaler()
+# X_train = scaler.fit_transform(X_train)
+# X_test = scaler.transform(X_test)
 
 # -------------------------
 # Model (ONE experiment)
 # -------------------------
-model = Ridge(alpha=1.0)
+model = LinearRegression()
 model.fit(X_train, y_train)
 
 # -------------------------
