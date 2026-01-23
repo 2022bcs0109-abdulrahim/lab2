@@ -2,77 +2,89 @@ name: ML CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   train:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
 
-    - name: Train model
-      run: |
-        python train.py
+      - name: Train model
+        run: |
+          python train.py
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: model-artifacts
-        path: |
-          output/model
-          output/results/metrics.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            output/model
+            output/results/metrics.json
 
   deploy:
     needs: train
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: model-artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
 
-    - name: Read metrics
-      id: metrics
-      run: |
-        echo "R2=$(jq '.r2' output/results/metrics.json)" >> $GITHUB_ENV
-        echo "MSE=$(jq '.mse' output/results/metrics.json)" >> $GITHUB_ENV
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq bc
 
-    - name: Compare metrics
-      run: |
-        if (( $(echo "$R2 <= ${{ vars.BEST_R2 }}" | bc -l) )); then
-          echo "2022BCS0109 ---- Metric did not improve"
-          exit 0
-        fi
+      - name: Read metrics
+        run: |
+          echo "R2=$(jq '.r2' output/results/metrics.json)" >> $GITHUB_ENV
+          echo "MSE=$(jq '.mse' output/results/metrics.json)" >> $GITHUB_ENV
 
-    - name: Docker login
-      run: |
-        echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      - name: Compare metrics
+        run: |
+          if (( $(echo "$R2 <= ${{ vars.BEST_R2 }}" | bc -l) )); then
+            echo "2022BCS0109 ---- Metric did not improve"
+            exit 0
+          fi
 
-    - name: Build Docker image
-      run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }} .
+      - name: Docker login
+        run: |
+          echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-    - name: Push Docker image
-      run: |
-        docker push ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }}
+      - name: Debug workspace
+        run: |
+          pwd
+          ls -la
+          find . -name Dockerfile
 
-    - name: Update best metric
-      run: |
-        gh variable set BEST_R2 -b "$R2"
-      env:
-        GH_TOKEN: ${{ secrets.GH_PAT }}
+      - name: Build Docker image
+        run: |
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }} .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }}
+
+      - name: Update best metrics
+        run: |
+          gh variable set BEST_R2 -b "$R2"
+          gh variable set BEST_MSE -b "$MSE"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
