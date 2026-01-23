@@ -31,8 +31,8 @@ jobs:
         with:
           name: model-artifacts
           path: |
-            output/model
-            output/results/metrics.json
+            app/artifacts/model.pkl
+            app/artifacts/metrics.json
 
   deploy:
     name: Deploy ML Model
@@ -46,7 +46,7 @@ jobs:
       - name: Download trained model artifacts
         uses: actions/download-artifact@v4
         with:
-          name: artifacts
+          name: model-artifacts
 
       # 🔍 Read & compare metrics (R2 ↑ and RMSE ↓)
       - name: Compare model metrics
