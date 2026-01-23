@@ -46,7 +46,7 @@ jobs:
       - name: Download trained model artifacts
         uses: actions/download-artifact@v4
         with:
-          name: experiment-artifacts
+          name: artifacts
 
       # 🔍 Read & compare metrics (R2 ↑ and RMSE ↓)
       - name: Compare model metrics
