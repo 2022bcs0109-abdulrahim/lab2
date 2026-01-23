@@ -84,7 +84,7 @@ jobs:
 
       - name: Update best metrics
         run: |
-          gh variable set BEST_R2 -b "$R2"
-          gh variable set BEST_MSE -b "$MSE"
+          gh variable set BEST_R2 "$R2"
+          gh variable set BEST_MSE "$MSE"
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
