@@ -32,7 +32,7 @@ jobs:
           name: model-artifacts
           path: |
             app/artifacts/model.pkl
-            app/artifacts/metrics.json
+            app/artifacts/results.json
 
   deploy:
     name: Deploy ML Model
