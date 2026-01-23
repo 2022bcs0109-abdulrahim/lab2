@@ -54,12 +54,22 @@ jobs:
 
       - name: Read metrics
         run: |
-          echo "R2=$(jq '.r2' output/results/metrics.json)" >> $GITHUB_ENV
-          echo "MSE=$(jq '.mse' output/results/metrics.json)" >> $GITHUB_ENV
+          echo "R2=$(jq -r '.r2' output/results/metrics.json)" >> $GITHUB_ENV
+          echo "MSE=$(jq -r '.mse' output/results/metrics.json)" >> $GITHUB_ENV
+
+      - name: Debug metrics
+        run: |
+          echo "Current R2: $R2"
+          echo "Current MSE: $MSE"
+          echo "Best R2: ${{ vars.BEST_R2 }}"
+          echo "Best MSE: ${{ vars.BEST_MSE }}"
 
       - name: Compare metrics
         run: |
-          if (( $(echo "$R2 <= ${{ vars.BEST_R2 }}" | bc -l) )); then
+          better_r2=$(echo "$R2 > ${{ vars.BEST_R2 }}" | bc -l)
+          better_mse=$(echo "$MSE < ${{ vars.BEST_MSE }}" | bc -l)
+
+          if [ "$better_r2" -eq 0 ] && [ "$better_mse" -eq 0 ]; then
             echo "2022BCS0109 ---- Metric did not improve"
             exit 0
           fi
@@ -76,7 +86,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f DockerFile -t ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }} .
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }} .
 
       - name: Push Docker image
         run: |
@@ -84,7 +94,7 @@ jobs:
 
       - name: Update best metrics
         run: |
-          gh variable set BEST_R2 --body "$R2"
-          gh variable set BEST_MSE --body "$MSE"
+          gh variable set BEST_R2 --value "$R2"
+          gh variable set BEST_MSE --value "$MSE"
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
