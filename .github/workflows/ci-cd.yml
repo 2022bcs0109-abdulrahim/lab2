@@ -31,82 +31,70 @@ jobs:
         with:
           name: model-artifacts
           path: |
-            app/artifacts/model.pkl
-            app/artifacts/results.json
+            output/model
+            output/results/metrics.json
 
   deploy:
-    name: Deploy ML Model
     needs: train
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download trained model artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: model-artifacts
 
-      # 🔍 Read & compare metrics (R2 ↑ and RMSE ↓)
-      - name: Compare model metrics
+      - name: Install system tools
         run: |
-          python <<EOF
-          import json, os
+          sudo apt-get update
+          sudo apt-get install -y jq bc
 
-          with open("metrics.json") as f:
-              m = json.load(f)
-
-          cur_r2 = m["r2"]
-          cur_rmse = m["rmse"]
-
-          best_r2 = float(os.environ.get("BEST_R2", 0))
-          best_rmse = float(os.environ.get("BEST_MSE", 999999))
-
-          print("Current R2:", cur_r2)
-          print("Best R2:", best_r2)
-          print("Current RMSE:", cur_rmse)
-          print("Best RMSE:", best_rmse)
-
-          if cur_r2 <= best_r2 or cur_rmse >= best_rmse:
-              print("2022BCD0055 ---- Metrics did not improve")
-              exit(0)
-
-          # export values for later steps
-          with open(os.environ["GITHUB_ENV"], "a") as env:
-              env.write(f"NEW_R2={cur_r2}\n")
-              env.write(f"NEW_RMSE={cur_rmse}\n")
-
-          print("Metrics improved. Proceeding with deployment.")
-          EOF
-
-      - name: Login to Docker Hub
+      - name: Read metrics
         run: |
-          echo "${{ secrets.DOCKER_TOKEN }}" | docker login \
-            -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          echo "R2=$(jq -r '.r2' output/results/metrics.json)" >> $GITHUB_ENV
+          echo "MSE=$(jq -r '.mse' output/results/metrics.json)" >> $GITHUB_ENV
+
+      - name: Debug metrics
+        run: |
+          echo "Current R2: $R2"
+          echo "Current MSE: $MSE"
+          echo "Best R2: ${{ vars.BEST_R2 }}"
+          echo "Best MSE: ${{ vars.BEST_MSE }}"
+
+      - name: Compare metrics
+        run: |
+          better_r2=$(echo "$R2 > ${{ vars.BEST_R2 }}" | bc -l)
+          better_mse=$(echo "$MSE < ${{ vars.BEST_MSE }}" | bc -l)
+
+          if [ "$better_r2" -eq 0 ] && [ "$better_mse" -eq 0 ]; then
+            echo "2022BCS0109 ---- Metric did not improve"
+            exit 0
+          fi
+
+      - name: Docker login
+        run: |
+          echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: Debug workspace
+        run: |
+          pwd
+          ls -la
+          find . -name Dockerfile
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/wine-quality:${{ github.run_id }} .
+          docker build -f Dockerile -t ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }} .
 
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/wine-quality:${{ github.run_id }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/wine_predict:${{ github.run_number }}
 
-      # 🔄 Update BEST_R2
-      - name: Update BEST_R2 variable
+      - name: Update best metrics
         run: |
-          curl -X PATCH \
-            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_R2 \
-            -d "{\"name\":\"BEST_R2\",\"value\":\"${NEW_R2}\"}"
-
-      # 🔄 Update BEST_MSE
-      - name: Update BEST_MSE variable
-        run: |
-          curl -X PATCH \
-            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_MSE \
-            -d "{\"name\":\"BEST_MSE\",\"value\":\"${NEW_RMSE}\"}"
+          gh variable set BEST_R2 --value "$R2"
+          gh variable set BEST_MSE --value "$MSE"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
