@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3.12'
+            args '-u root'
+        }
+    }
 
     environment {
         DOCKER_IMAGE = "wine-quality"
@@ -7,14 +12,12 @@ pipeline {
 
     stages {
 
-        // ❌ DO NOT ADD MANUAL CHECKOUT
-        // Jenkins already checks out the repo automatically
-
-        stage('Setup Python Virtual Environment') {
+        stage('Setup Environment') {
             steps {
                 sh '''
-                    python3 -m venv venv
+                    python -m venv venv
                     . venv/bin/activate
+                    pip install --upgrade pip
                     pip install -r requirements.txt
                 '''
             }
@@ -44,14 +47,10 @@ pipeline {
                 script {
                     withCredentials([string(credentialsId: 'best-accuracy', variable: 'BEST_ACC')]) {
 
-                        echo "Best Accuracy: ${BEST_ACC}"
-
                         if (env.CURRENT_ACCURACY.toFloat() > BEST_ACC.toFloat()) {
                             env.BUILD_MODEL = "true"
-                            echo "Model improved!"
                         } else {
                             env.BUILD_MODEL = "false"
-                            echo "Model did not improve."
                         }
                     }
                 }
