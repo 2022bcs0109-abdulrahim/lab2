@@ -7,12 +7,8 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                git credentialsId: 'git-creds',
-                    url: 'https://github.com/2022bcs0109-abdulrahim/lab2.git'
-            }
-        }
+        // ❌ DO NOT ADD MANUAL CHECKOUT
+        // Jenkins already checks out the repo automatically
 
         stage('Setup Python Virtual Environment') {
             steps {
@@ -47,6 +43,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'best-accuracy', variable: 'BEST_ACC')]) {
+
                         echo "Best Accuracy: ${BEST_ACC}"
 
                         if (env.CURRENT_ACCURACY.toFloat() > BEST_ACC.toFloat()) {
