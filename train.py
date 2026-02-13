@@ -75,10 +75,10 @@ joblib.dump(model, "output/model/model.pkl")
 # -------------------------
 # Save results
 # -------------------------
-results = {
-    "MSE": mse,
-    "R2": r2
+metrics = {
+    "mse": mse,
+    "r2": r2
 }
 
-with open("output/results/results.json", "w") as f:
-    json.dump(results, f, indent=4)
+with open("output/results/metrics.json", "w") as f:
+    json.dump(metrics, f, indent=4)
