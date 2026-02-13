@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "wine-quality"
+        DOCKERHUB_USER = "2022bcs0109"   // <-- your dockerhub username
+        IMAGE_NAME = "wine-quality"
     }
 
     stages {
@@ -30,8 +31,8 @@ pipeline {
         stage('Read Accuracy') {
             steps {
                 script {
-                    def metrics = readJSON file: 'output/results/metrics.json'
-                    env.CURRENT_ACCURACY = metrics.r2.toString()
+                    def metrics = readJSON file: 'output/results/results.json'
+                    env.CURRENT_ACCURACY = metrics.R2.toString()
                     echo "Current Accuracy: ${env.CURRENT_ACCURACY}"
                 }
             }
@@ -44,8 +45,10 @@ pipeline {
 
                         if (env.CURRENT_ACCURACY.toFloat() > BEST_ACC.toFloat()) {
                             env.BUILD_MODEL = "true"
+                            echo "Model improved. Will build Docker image."
                         } else {
                             env.BUILD_MODEL = "false"
+                            echo "Model did not improve."
                         }
                     }
                 }
@@ -57,9 +60,9 @@ pipeline {
                 expression { env.BUILD_MODEL == "true" }
             }
             steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}:${BUILD_NUMBER}")
-                }
+                sh """
+                    docker build -t ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER} .
+                """
             }
         }
 
@@ -68,11 +71,12 @@ pipeline {
                 expression { env.BUILD_MODEL == "true" }
             }
             steps {
-                script {
-                    docker.withRegistry('', 'dockerhub-creds') {
-                        docker.image("${DOCKER_IMAGE}:${BUILD_NUMBER}").push()
-                        docker.image("${DOCKER_IMAGE}:${BUILD_NUMBER}").push("latest")
-                    }
+                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
+                    sh """
+                        docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker tag ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKERHUB_USER}/${IMAGE_NAME}:latest
+                        docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:latest
+                    """
                 }
             }
         }
