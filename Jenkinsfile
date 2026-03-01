@@ -74,7 +74,7 @@ stage('Run Container') {
                     def status = sh(
                         script: """
                             curl -s -o /dev/null -w '%{http_code}' \
-                            -X POST http://localhost:${PORT}/predict \
+                            -X POST http://${CONTAINER}:8000/predict \
                             -H "Content-Type: application/json" \
                             -d @tests/invalid.json
                         """,
