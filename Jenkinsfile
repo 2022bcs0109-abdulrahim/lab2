@@ -19,16 +19,16 @@ pipeline {
                 sh "docker pull ${IMAGE}"
             }
         }
-
-        stage('Run Container') {
-            steps {
-                sh """
-                docker stop ${CONTAINER} || true
-                docker rm ${CONTAINER} || true
-                docker run -d -p ${PORT}:8000 --name ${CONTAINER} ${IMAGE}
-            """
-                }
-        }
+stage('Run Container') {
+    steps {
+        sh """
+            docker stop ${CONTAINER} || true
+            docker rm ${CONTAINER} || true
+            docker run -d --network lab7-network \
+              --name ${CONTAINER} ${IMAGE}
+        """
+    }
+}
 
        stage('Wait for API') {
         steps {
