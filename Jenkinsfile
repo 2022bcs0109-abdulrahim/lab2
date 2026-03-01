@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = "2022bcs0109"
-        IMAGE_NAME = "wine-quality"
-        IMAGE_TAG = "latest"
-        CONTAINER_NAME = "wine-validation-container"
+        IMAGE = "2022bcs0109/wine-quality:latest"
+        CONTAINER = "wine-lab7-test"
         PORT = "8000"
     }
 
@@ -13,24 +11,19 @@ pipeline {
 
         stage('Pull Image') {
             steps {
-                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
-                    sh """
-                        docker pull ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}
-                    """
-                }
+                sh "docker pull ${IMAGE}"
             }
         }
 
         stage('Run Container') {
             steps {
                 sh """
-                    docker run -d -p ${PORT}:8000 --name ${CONTAINER_NAME} \
-                    ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker run -d -p ${PORT}:8000 --name ${CONTAINER} ${IMAGE}
                 """
             }
         }
 
-        stage('Wait for Service Readiness') {
+        stage('Wait for API') {
             steps {
                 script {
                     timeout(time: 60, unit: 'SECONDS') {
@@ -48,7 +41,7 @@ pipeline {
             }
         }
 
-        stage('Send Valid Inference Request') {
+        stage('Valid Inference Test') {
             steps {
                 script {
                     def response = sh(
@@ -63,13 +56,13 @@ pipeline {
                     echo "Valid Response: ${response}"
 
                     if (!response.contains("prediction")) {
-                        error("Prediction field missing in valid response!")
+                        error("Prediction field missing!")
                     }
                 }
             }
         }
 
-        stage('Send Invalid Inference Request') {
+        stage('Invalid Inference Test') {
             steps {
                 script {
                     def status = sh(
@@ -82,7 +75,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    echo "Invalid request status code: ${status}"
+                    echo "Invalid request status: ${status}"
 
                     if (status == "200") {
                         error("Invalid input incorrectly returned 200!")
@@ -94,19 +87,19 @@ pipeline {
         stage('Stop Container') {
             steps {
                 sh """
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
+                    docker stop ${CONTAINER} || true
+                    docker rm ${CONTAINER} || true
                 """
             }
         }
     }
 
     post {
+        success {
+            echo "Pipeline PASSED — Model validated successfully."
+        }
         failure {
             echo "Pipeline FAILED — Model validation failed."
-        }
-        success {
-            echo "Pipeline PASSED — Model inference validated successfully."
         }
     }
 }
