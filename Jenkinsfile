@@ -46,7 +46,7 @@ pipeline {
              }
          }
       }
-  , }
+   }
         stage('Valid Inference Test') {
             steps {
                 script {
