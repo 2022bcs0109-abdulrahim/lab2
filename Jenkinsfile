@@ -47,26 +47,26 @@ stage('Run Container') {
          }
       }
    }
-        stage('Valid Inference Test') {
-            steps {
-                script {
-                    def response = sh(
-                        script: """
-                            curl -s -X POST http://localhost:${PORT}/predict \
-                            -H "Content-Type: application/json" \
-                            -d @tests/valid.json
-                        """,
-                        returnStdout: true
-                    ).trim()
+      stage('Valid Inference Test') {
+    steps {
+        script {
+            def response = sh(
+                script: """
+                    curl -s -X POST http://${CONTAINER}:8000/predict \
+                    -H "Content-Type: application/json" \
+                    -d @tests/valid.json
+                """,
+                returnStdout: true
+            ).trim()
 
-                    echo "Valid Response: ${response}"
+            echo "Valid Response: ${response}"
 
-                    if (!response.contains("prediction")) {
-                        error("Prediction field missing!")
-                    }
-                }
+            if (!response.contains("prediction")) {
+                error("Prediction field missing!")
             }
         }
+    }
+}
 
         stage('Invalid Inference Test') {
             steps {
