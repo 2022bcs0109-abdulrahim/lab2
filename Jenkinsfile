@@ -30,24 +30,23 @@ pipeline {
                 }
         }
 
-        stage('Wait for API') {
-            steps {
-                script {
-                    timeout(time: 60, unit: 'SECONDS') {
-                        waitUntil {
-                            def status = sh(
-                                script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}/docs || true",
-                                returnStdout: true
-                            ).trim()
+       stage('Wait for API') {
+        steps {
+            script {
+                timeout(time: 60, unit: 'SECONDS') {
+                    waitUntil {
+                    def status = sh(
+                        script: "curl -s -o /dev/null -w '%{http_code}' http://${CONTAINER}:8000/docs || true",
+                        returnStdout: true
+                    ).trim()
 
-                            echo "Health check status: ${status}"
-                            return (status == "200")
-                        }
-                    }
-                }
-            }
+                    echo "Health check status: ${status}"
+                    return (status == "200")
+                 }
+             }
         }
-
+     }
+}
         stage('Valid Inference Test') {
             steps {
                 script {
