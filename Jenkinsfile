@@ -2,89 +2,111 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = "2022bcs0109"   // <-- your dockerhub username
+        DOCKERHUB_USER = "2022bcs0109"
         IMAGE_NAME = "wine-quality"
+        IMAGE_TAG = "latest"
+        CONTAINER_NAME = "wine-validation-container"
+        PORT = "8000"
     }
 
     stages {
 
-        stage('Setup Python Virtual Environment') {
+        stage('Pull Image') {
             steps {
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-
-        stage('Train Model') {
-            steps {
-                sh '''
-                    . venv/bin/activate
-                    python train.py
-                '''
-            }
-        }
-
-        stage('Read Accuracy') {
-            steps {
-                script {
-                    def metrics = readJSON file: 'output/results/results.json'
-                    env.CURRENT_ACCURACY = metrics.R2.toString()
-                    echo "Current Accuracy: ${env.CURRENT_ACCURACY}"
+                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
+                    sh """
+                        docker pull ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}
+                    """
                 }
             }
         }
 
-        stage('Compare Accuracy') {
+        stage('Run Container') {
+            steps {
+                sh """
+                    docker run -d -p ${PORT}:8000 --name ${CONTAINER_NAME} \
+                    ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}
+                """
+            }
+        }
+
+        stage('Wait for Service Readiness') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'best-accuracy', variable: 'BEST_ACC')]) {
+                    timeout(time: 60, unit: 'SECONDS') {
+                        waitUntil {
+                            def status = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}/docs || true",
+                                returnStdout: true
+                            ).trim()
 
-                        if (env.CURRENT_ACCURACY.toFloat() > BEST_ACC.toFloat()) {
-                            env.BUILD_MODEL = "true"
-                            echo "Model improved. Will build Docker image."
-                        } else {
-                            env.BUILD_MODEL = "false"
-                            echo "Model did not improve."
+                            echo "Health check status: ${status}"
+                            return (status == "200")
                         }
                     }
                 }
             }
         }
 
-        stage('Build Docker Image') {
-            when {
-                expression { env.BUILD_MODEL == "true" }
-            }
+        stage('Send Valid Inference Request') {
             steps {
-                sh """
-                    docker build -t ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER} .
-                """
+                script {
+                    def response = sh(
+                        script: """
+                            curl -s -X POST http://localhost:${PORT}/predict \
+                            -H "Content-Type: application/json" \
+                            -d @tests/valid.json
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Valid Response: ${response}"
+
+                    if (!response.contains("prediction")) {
+                        error("Prediction field missing in valid response!")
+                    }
+                }
             }
         }
 
-        stage('Push Docker Image') {
-            when {
-                expression { env.BUILD_MODEL == "true" }
-            }
+        stage('Send Invalid Inference Request') {
             steps {
-                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
-                    sh """
-                        docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}
-                        docker tag ${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKERHUB_USER}/${IMAGE_NAME}:latest
-                        docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:latest
-                    """
+                script {
+                    def status = sh(
+                        script: """
+                            curl -s -o /dev/null -w '%{http_code}' \
+                            -X POST http://localhost:${PORT}/predict \
+                            -H "Content-Type: application/json" \
+                            -d @tests/invalid.json
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Invalid request status code: ${status}"
+
+                    if (status == "200") {
+                        error("Invalid input incorrectly returned 200!")
+                    }
                 }
+            }
+        }
+
+        stage('Stop Container') {
+            steps {
+                sh """
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                """
             }
         }
     }
 
     post {
-        always {
-            archiveArtifacts artifacts: 'output/**', fingerprint: true
+        failure {
+            echo "Pipeline FAILED — Model validation failed."
+        }
+        success {
+            echo "Pipeline PASSED — Model inference validated successfully."
         }
     }
 }
