@@ -83,7 +83,11 @@ pipeline {
                 }
             }
         }
-
+        stage('Docker Test') {
+            steps {
+            sh 'docker ps'
+            }
+    }
         stage('Stop Container') {
             steps {
                 sh """
