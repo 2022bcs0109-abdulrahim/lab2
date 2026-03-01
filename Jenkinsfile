@@ -8,6 +8,11 @@ pipeline {
     }
 
     stages {
+        stage('Docker Test') {
+            steps {
+            sh 'docker ps'
+            }
+    }
 
         stage('Pull Image') {
             steps {
@@ -83,11 +88,6 @@ pipeline {
                 }
             }
         }
-        stage('Docker Test') {
-            steps {
-            sh 'docker ps'
-            }
-    }
         stage('Stop Container') {
             steps {
                 sh """
