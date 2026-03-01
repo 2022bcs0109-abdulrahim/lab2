@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = "2022bcs0109/wine-quality:latest"
+        IMAGE = "2022bcs0109/wine_predict:21"
         CONTAINER = "wine-lab7-test"
         PORT = "8000"
     }
