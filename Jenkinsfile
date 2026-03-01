@@ -44,9 +44,9 @@ pipeline {
                     return (status == "200")
                  }
              }
-        }
-     }
-}
+         }
+      }
+  , }
         stage('Valid Inference Test') {
             steps {
                 script {
