@@ -52,16 +52,25 @@ stage('Run Container') {
         script {
             def response = sh(
                 script: """
-                    curl -s -X POST http://${CONTAINER}:8000/predict \
-                    -H "Content-Type: application/json" \
-                    -d @tests/valid.json
+                    curl -s "http://${CONTAINER}:8000/predict?\
+fixed_acidity=7.4&\
+volatile_acidity=0.7&\
+citric_acid=0.0&\
+residual_sugar=1.9&\
+chlorides=0.076&\
+free_sulfur_dioxide=11.0&\
+total_sulfur_dioxide=34.0&\
+density=0.9978&\
+ph=3.51&\
+sulphates=0.56&\
+alcohol=9.4"
                 """,
                 returnStdout: true
             ).trim()
 
             echo "Valid Response: ${response}"
 
-            if (!response.contains("prediction")) {
+            if (!response.contains("predicted_quality")) {
                 error("Prediction field missing!")
             }
         }
@@ -69,26 +78,24 @@ stage('Run Container') {
 }
 
         stage('Invalid Inference Test') {
-            steps {
-                script {
-                    def status = sh(
-                        script: """
-                            curl -s -o /dev/null -w '%{http_code}' \
-                            -X POST http://${CONTAINER}:8000/predict \
-                            -H "Content-Type: application/json" \
-                            -d @tests/invalid.json
-                        """,
-                        returnStdout: true
-                    ).trim()
+    steps {
+        script {
+            def status = sh(
+                script: """
+                    curl -s -o /dev/null -w "%{http_code}" \
+                    "http://${CONTAINER}:8000/predict"
+                """,
+                returnStdout: true
+            ).trim()
 
-                    echo "Invalid request status: ${status}"
+            echo "Invalid request status: ${status}"
 
-                    if (status == "200") {
-                        error("Invalid input incorrectly returned 200!")
-                    }
-                }
+            if (status != "422") {
+                error("Expected 422 for invalid input!")
             }
         }
+    }
+}
         stage('Stop Container') {
             steps {
                 sh """
